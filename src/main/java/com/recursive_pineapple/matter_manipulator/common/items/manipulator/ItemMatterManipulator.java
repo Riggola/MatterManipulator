@@ -808,7 +808,7 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
                 return true;
             }
             case EXCH_ADD_REPLACE: {
-                onExchangeAddWhitelist(world, player, itemStack, state, hit);
+                onExchangeAddWhitelist(world, player, itemStack, state, hit, null);
                 state.config.action = null;
                 return true;
             }
@@ -846,6 +846,27 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
         if (state.config.placeMode == PlaceMode.CABLES) {
             onPickCable(player.getEntityWorld(), player, stack, state, MMUtils.getHitResult(player, true), null);
         }
+    }
+
+    /** Add to the Exchange whitelist without resetting its other entries. */
+    public void onMMBAddWhitelist(EntityPlayer player, ItemStack stack, MMState state) {
+        if (state.config.placeMode != PlaceMode.EXCHANGING) return;
+
+        MovingObjectPosition hit = MMUtils.getHitResult(player, true);
+        if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) return;
+
+        onExchangeAddWhitelist(player.worldObj, player, stack, state, hit, null);
+    }
+
+    public static void onMMBAddWhitelistInGUI(
+        EntityPlayer player,
+        ItemStack stack,
+        MMState state,
+        ItemStack hoveredStack
+    ) {
+        if (state.config.placeMode != PlaceMode.EXCHANGING || hoveredStack == null || hoveredStack.getItem() == null) { return; }
+
+        onExchangeAddWhitelist(player.worldObj, player, stack, state, null, BlockSpec.fromStack(null, hoveredStack));
     }
 
     static public void onMMBPressedInGUI(EntityPlayer player, ItemStack stack, MMState state, final boolean isSneaking, ItemStack hoveredStack) {
@@ -958,15 +979,16 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
         );
     }
 
-    private void onExchangeAddWhitelist(
+    static private void onExchangeAddWhitelist(
         World world,
         EntityPlayer player,
         ItemStack stack,
         MMState state,
-        MovingObjectPosition hit
+        MovingObjectPosition hit,
+        BlockSpec block
     ) {
 
-        BlockSpec block = BlockSpec.fromPickBlock(player.worldObj, player, hit);
+        if (block == null) block = BlockSpec.fromPickBlock(player.worldObj, player, hit);
 
         if (hit != null) checkForAECables(state, block, world, hit.blockX, hit.blockY, hit.blockZ);
 
@@ -2692,12 +2714,16 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
             if (event.button == 2 /* MMB */ && event.buttonstate && heldItem.getItem() == ItemMatterManipulator.this) {
                 event.setCanceled(true);
 
-                // call onMMBPressed on the client and the server
                 MMState state = getState(heldItem);
-                onMMBPressed(player, heldItem, state);
+                boolean addToWhitelist = state.config.placeMode == PlaceMode.EXCHANGING && MMKeyInputs.isAddWhitelistModifierDown();
+                if (addToWhitelist) {
+                    onMMBAddWhitelist(player, heldItem, state);
+                } else {
+                    onMMBPressed(player, heldItem, state);
+                }
                 setState(heldItem, state);
 
-                Messages.MMBPressed.sendToServer();
+                (addToWhitelist ? Messages.MMBAddWhitelist : Messages.MMBPressed).sendToServer();
             }
         }
 

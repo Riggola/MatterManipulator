@@ -68,7 +68,8 @@ public abstract class MixinGuiContainer_PickBlock {
         ItemMatterManipulator.onMMBPressedInGUI(player, cursorStack, state, isSneak, hoveredStack);
         ItemMatterManipulator.setState(cursorStack, state);
 
-        Messages.MMBPressedInGUI.sendToServer(new Messages.CursorItemStackData(hoveredStack, isSneak));
+        (addToWhitelist ? Messages.MMBAddWhitelistInGUI : Messages.MMBPressedInGUI)
+            .sendToServer(new Messages.CursorItemStackData(hoveredStack, isSneak));
     }
 
     @Invoker("getSlotAtPosition")

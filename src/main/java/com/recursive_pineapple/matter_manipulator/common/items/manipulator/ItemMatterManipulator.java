@@ -943,6 +943,27 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
         }
     }
 
+    /** Add to the Exchange whitelist without resetting its other entries. */
+    public void onMMBAddWhitelist(EntityPlayer player, ItemStack stack, MMState state) {
+        if (state.config.placeMode != PlaceMode.EXCHANGING) return;
+
+        MovingObjectPosition hit = MMUtils.getHitResult(player, true);
+        if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) return;
+
+        onExchangeAddWhitelist(player.worldObj, player, stack, state, hit, null);
+    }
+
+    public static void onMMBAddWhitelistInGUI(
+        EntityPlayer player,
+        ItemStack stack,
+        MMState state,
+        ItemStack hoveredStack
+    ) {
+        if (state.config.placeMode != PlaceMode.EXCHANGING || hoveredStack == null || hoveredStack.getItem() == null) { return; }
+
+        onExchangeAddWhitelist(player.worldObj, player, stack, state, null, BlockSpec.fromStack(null, hoveredStack));
+    }
+
     static public void onMMBPressedInGUI(EntityPlayer player, ItemStack stack, MMState state, final boolean isSneaking, ItemStack hoveredStack) {
         BlockSpec block = BlockSpec.fromStack(null, hoveredStack);
 
@@ -2808,12 +2829,11 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
             if (event.button == 2 /* MMB */ && event.buttonstate && heldItem.getItem() == ItemMatterManipulator.this) {
                 event.setCanceled(true);
 
-                // call onMMBPressed on the client and the server
                 MMState state = getState(heldItem);
                 onMMBPressed(player, heldItem, state);
                 setState(heldItem, state);
 
-                Messages.MMBPressed.sendToServer();
+                (addToWhitelist ? Messages.MMBAddWhitelist : Messages.MMBPressed).sendToServer();
             }
 
             if (

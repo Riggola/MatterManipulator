@@ -7,10 +7,12 @@ import static com.recursive_pineapple.matter_manipulator.common.utils.Mods.GregT
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,6 +68,7 @@ import com.recursive_pineapple.matter_manipulator.common.building.AEPartData;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer.RegionAnalysis;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockSpec;
+import com.recursive_pineapple.matter_manipulator.common.building.CopyableProperty;
 import com.recursive_pineapple.matter_manipulator.common.building.GTAnalysisResult;
 import com.recursive_pineapple.matter_manipulator.common.building.ImmutableBlockSpec;
 import com.recursive_pineapple.matter_manipulator.common.building.InteropConstants;
@@ -718,8 +721,13 @@ public class MMState {
 
             PendingBlock rep = block.instantiate(world, x, y, z);
 
-            rep.analyze(world.getTileEntity(x, y, z), PendingBlock.ANALYZE_ALL);
+            TileEntity previous = world.getTileEntity(x, y, z);
+            rep.analyze(previous, PendingBlock.ANALYZE_ALL);
             rep.migrate();
+
+            if (GregTech.isModLoaded() && block.getBlock() instanceof BlockMachines) {
+                applyExchangeFacing(rep, previous, existing, replacement);
+            }
 
             if (hasCap(ItemMatterManipulator.ALLOW_CABLES)) {
                 if (AppliedEnergistics2.isModLoaded() && MMUtils.isAECable(replacement)) {
@@ -731,6 +739,52 @@ public class MMState {
         }
 
         return pending;
+    }
+
+    @Optional(Names.GREG_TECH_NH)
+    static void captureExchangeFacing(World world, int x, int y, int z, BlockSpec spec) {
+        TileEntity te = world.getTileEntity(x, y, z);
+        if (!(te instanceof IGregTechTileEntity gt)) return;
+
+        ForgeDirection facing = gt.getFrontFacing();
+        if (facing == null || facing == ForgeDirection.UNKNOWN) return;
+
+        EnumMap<CopyableProperty, String> properties = new EnumMap<>(CopyableProperty.class);
+        if (spec.properties != null) properties.putAll(spec.properties);
+        properties.put(CopyableProperty.FACING, facing.name().toLowerCase(Locale.ROOT));
+        spec.properties = properties;
+    }
+
+    @Optional(Names.GREG_TECH_NH)
+    private void applyExchangeFacing(
+        PendingBlock pending,
+        TileEntity previous,
+        ImmutableBlockSpec existing,
+        ImmutableBlockSpec replacement
+    ) {
+        ForgeDirection selectedFacing = parseExchangeFacing(replacement.getProperty(CopyableProperty.FACING));
+        if (selectedFacing == null) return;
+
+        // GT machines already carry their front (or extended alignment) through GTAnalysisResult.
+        if (previous instanceof IGregTechTileEntity gt) {
+            ForgeDirection oldFacing = gt.getFrontFacing();
+            if (oldFacing != null && oldFacing != ForgeDirection.UNKNOWN) return;
+        }
+
+        ForgeDirection oldFacing = parseExchangeFacing(existing.getProperty(CopyableProperty.FACING));
+        if (oldFacing == null) oldFacing = parseExchangeFacing(existing.getProperty(CopyableProperty.FORWARD));
+        pending.exchangeFacing = oldFacing != null ? oldFacing : selectedFacing;
+    }
+
+    private static ForgeDirection parseExchangeFacing(String value) {
+        if (value == null) return null;
+
+        try {
+            ForgeDirection facing = ForgeDirection.valueOf(value.toUpperCase(Locale.ROOT));
+            return facing == ForgeDirection.UNKNOWN ? null : facing;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @Optional(Names.APPLIED_ENERGISTICS2)

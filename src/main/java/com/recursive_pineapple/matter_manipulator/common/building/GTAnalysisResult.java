@@ -268,6 +268,39 @@ public class GTAnalysisResult implements ITileAnalysisIntegration {
         }
     }
 
+    /** Applies only the front direction, without copying machine settings or inventory data. */
+    public static boolean applyExchangeFacing(IBlockApplyContext ctx, ForgeDirection facing) {
+        if (facing == null || facing == ForgeDirection.UNKNOWN) return false;
+        if (!(ctx.getTileEntity() instanceof IGregTechTileEntity gt)) return false;
+
+        IMetaTileEntity mte = gt.getMetaTileEntity();
+        if (mte == null || !mte.isFacingValid(facing)) return false;
+
+        if (mte instanceof IAlignmentProvider provider) {
+            IAlignment alignment = provider.getAlignment();
+            if (alignment == null) return false;
+
+            ExtendedFacing current = alignment.getExtendedFacing();
+            if (current == null || current.getDirection() == facing) return false;
+
+            ExtendedFacing wanted = ExtendedFacing.of(facing, current.getRotation(), current.getFlip());
+            if (!alignment.isNewExtendedFacingValid(wanted)) {
+                wanted = ExtendedFacing.of(facing, current.getRotation(), Flip.NONE);
+            }
+
+            if (!alignment.isNewExtendedFacingValid(wanted)) return false;
+
+            gt.setFrontFacing(facing);
+            alignment.toolSetExtendedFacing(wanted);
+            return true;
+        }
+
+        if (gt.getFrontFacing() == facing) return false;
+
+        gt.setFrontFacing(facing);
+        return true;
+    }
+
     @Override
     public boolean apply(IBlockApplyContext ctx) {
         World world = ctx.getWorld();

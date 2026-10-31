@@ -970,7 +970,7 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
         if (hit != null) checkForAECables(state, block, world, hit.blockX, hit.blockY, hit.blockZ);
 
         if (hit != null && Mods.GregTech.isModLoaded()) {
-            MMState.captureExchangeFacing(world, hit.blockX, hit.blockY, hit.blockZ, block);
+            MMState.captureExchangeAppearance(world, hit.blockX, hit.blockY, hit.blockZ, block);
         }
 
         state.config.replaceWith = new WeightedSpecList();

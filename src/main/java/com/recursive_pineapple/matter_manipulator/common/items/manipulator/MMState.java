@@ -745,6 +745,13 @@ public class MMState {
 
             if (GregTech.isModLoaded() && block.getBlock() instanceof BlockMachines) {
                 applyExchangeFacing(rep, previous, existing, replacement);
+                String colour = replacement.getProperty(CopyableProperty.COLOR);
+                if (colour != null) {
+                    try {
+                        byte value = Byte.parseByte(colour);
+                        if (value >= -1 && value <= 15) rep.exchangeColour = value;
+                    } catch (NumberFormatException ignored) {}
+                }
             }
 
             if (hasCap(ItemMatterManipulator.ALLOW_CABLES)) {
@@ -760,16 +767,18 @@ public class MMState {
     }
 
     @Optional(Names.GREG_TECH_NH)
-    static void captureExchangeFacing(World world, int x, int y, int z, BlockSpec spec) {
+    static void captureExchangeAppearance(World world, int x, int y, int z, BlockSpec spec) {
         TileEntity te = world.getTileEntity(x, y, z);
         if (!(te instanceof IGregTechTileEntity gt)) return;
 
         ForgeDirection facing = gt.getFrontFacing();
-        if (facing == null || facing == ForgeDirection.UNKNOWN) return;
 
         EnumMap<CopyableProperty, String> properties = new EnumMap<>(CopyableProperty.class);
         if (spec.properties != null) properties.putAll(spec.properties);
-        properties.put(CopyableProperty.FACING, facing.name().toLowerCase(Locale.ROOT));
+        if (facing != null && facing != ForgeDirection.UNKNOWN) {
+            properties.put(CopyableProperty.FACING, facing.name().toLowerCase(Locale.ROOT));
+        }
+        properties.put(CopyableProperty.COLOR, Byte.toString(gt.getColorization()));
         spec.properties = properties;
     }
 
@@ -782,6 +791,12 @@ public class MMState {
     ) {
         ForgeDirection selectedFacing = parseExchangeFacing(replacement.getProperty(CopyableProperty.FACING));
         if (selectedFacing == null) return;
+
+        // Reconfiguring the same GT machine should use the picked front.
+        if (existing.isEquivalent(replacement)) {
+            pending.exchangeFacing = selectedFacing;
+            return;
+        }
 
         // GT machines already carry their front (or extended alignment) through GTAnalysisResult.
         if (previous instanceof IGregTechTileEntity gt) {

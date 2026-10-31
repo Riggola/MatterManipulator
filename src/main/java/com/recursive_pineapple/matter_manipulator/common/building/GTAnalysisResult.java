@@ -314,6 +314,15 @@ public class GTAnalysisResult implements ITileAnalysisIntegration {
         return true;
     }
 
+    /** Updates only the GT paint colour, leaving every other machine setting untouched. */
+    public static boolean applyExchangeColour(IBlockApplyContext ctx, byte colour) {
+        if (!(ctx.getTileEntity() instanceof IGregTechTileEntity gt)) return false;
+        if (gt.getColorization() == colour) return false;
+
+        gt.setColorization(colour);
+        return true;
+    }
+
     @Override
     public boolean apply(IBlockApplyContext ctx) {
         World world = ctx.getWorld();

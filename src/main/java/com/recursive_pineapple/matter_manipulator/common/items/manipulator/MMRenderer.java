@@ -39,6 +39,7 @@ import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer.
 import com.recursive_pineapple.matter_manipulator.common.building.BlockSpec;
 import com.recursive_pineapple.matter_manipulator.common.building.PendingBlock;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.MMConfig.VoxelAABB;
+import com.recursive_pineapple.matter_manipulator.common.items.manipulator.MMState.PendingAction;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.MMState.PlaceMode;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.MMState.Shape;
 import com.recursive_pineapple.matter_manipulator.common.utils.MMUtils;
@@ -48,6 +49,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.opengl.GL11;
 
+import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
@@ -218,6 +220,9 @@ public class MMRenderer {
      */
     private static void renderSelectionImpl(RenderWorldLastEvent event) {
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        if (player == null || player.worldObj == null) return;
+
+        resetOnWorldChange(player, player.worldObj);
         ItemStack held = player.getHeldItem();
 
         if (held != null && held.getItem() instanceof ItemMatterManipulator manipulator) {
@@ -247,6 +252,7 @@ public class MMRenderer {
     private static void clear(EntityPlayer player) {
         lastAnalysisMS = 0;
         lastAnalyzedConfig = null;
+        analysisCache = null;
         lastPlayerPosition = null;
         nextSourceCheckMS = 0;
         nextPasteChunkCheckMS = 0;

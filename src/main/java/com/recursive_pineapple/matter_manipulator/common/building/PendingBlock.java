@@ -61,6 +61,11 @@ public class PendingBlock extends Location {
     public ITileAnalysisIntegration cb;
     public transient SmartCopyIntegration smartCopy;
 
+    /** Optional front used when a GT Exchange target was picked from the world. */
+    public ForgeDirection exchangeFacing;
+    /** Optional paint used when a GT Exchange target was picked from the world. */
+    public Byte exchangeColour;
+
     public InventoryAnalysis inventory = null;
 
     public int renderOrder, buildOrder;
@@ -83,6 +88,8 @@ public class PendingBlock extends Location {
         this.mp = null;
         this.cb = null;
         this.smartCopy = null;
+        this.exchangeFacing = null;
+        this.exchangeColour = null;
         this.inventory = null;
         this.renderOrder = 0;
         this.buildOrder = 0;
@@ -389,6 +396,18 @@ public class PendingBlock extends Location {
                     success = false;
                 }
             }
+
+            if (success && exchangeFacing != null && Mods.GregTech.isModLoaded()) {
+                if (GTAnalysisResult.applyExchangeFacing(context, exchangeFacing)) {
+                    ref.didSomething = true;
+                }
+            }
+
+            if (success && exchangeColour != null && Mods.GregTech.isModLoaded()) {
+                if (GTAnalysisResult.applyExchangeColour(context, exchangeColour)) {
+                    ref.didSomething = true;
+                }
+            }
         } finally {
             context.givePlayerItems(BlockCaptureDrops.stopCapturingDrops(world).toArray(new ItemStack[0]));
 
@@ -472,6 +491,8 @@ public class PendingBlock extends Location {
         result = prime * result + ((mp == null) ? 0 : mp.hashCode());
         result = prime * result + ((cb == null) ? 0 : cb.hashCode());
         result = prime * result + ((inventory == null) ? 0 : inventory.hashCode());
+        result = prime * result + ((exchangeFacing == null) ? 0 : exchangeFacing.hashCode());
+        result = prime * result + ((exchangeColour == null) ? 0 : exchangeColour.hashCode());
         result = prime * result + renderOrder;
         result = prime * result + buildOrder;
         return result;
@@ -504,6 +525,10 @@ public class PendingBlock extends Location {
         if (inventory == null) {
             if (other.inventory != null) return false;
         } else if (!inventory.equals(other.inventory)) return false;
+        if (exchangeFacing != other.exchangeFacing) return false;
+        if (exchangeColour == null) {
+            if (other.exchangeColour != null) return false;
+        } else if (!exchangeColour.equals(other.exchangeColour)) return false;
         if (renderOrder != other.renderOrder) return false;
         if (buildOrder != other.buildOrder) return false;
         return true;

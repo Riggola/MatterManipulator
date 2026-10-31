@@ -825,7 +825,7 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
                 return true;
             }
             case EXCH_ADD_REPLACE: {
-                onExchangeAddWhitelist(world, player, itemStack, state, hit);
+                onExchangeAddWhitelist(world, player, itemStack, state, hit, null);
                 state.config.action = null;
                 return true;
             }
@@ -1064,6 +1064,10 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
 
         if (hit != null) checkForAECables(state, block, world, hit.blockX, hit.blockY, hit.blockZ);
 
+        if (hit != null && Mods.GregTech.isModLoaded()) {
+            MMState.captureExchangeAppearance(world, hit.blockX, hit.blockY, hit.blockZ, block);
+        }
+
         state.config.replaceWith = new WeightedSpecList();
         state.config.replaceWith.add(block);
 
@@ -1074,15 +1078,16 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
         );
     }
 
-    private void onExchangeAddWhitelist(
+    static private void onExchangeAddWhitelist(
         World world,
         EntityPlayer player,
         ItemStack stack,
         MMState state,
-        MovingObjectPosition hit
+        MovingObjectPosition hit,
+        BlockSpec block
     ) {
 
-        BlockSpec block = BlockSpec.fromPickBlock(player.worldObj, player, hit);
+        if (block == null) block = BlockSpec.fromPickBlock(player.worldObj, player, hit);
 
         if (hit != null) checkForAECables(state, block, world, hit.blockX, hit.blockY, hit.blockZ);
 
@@ -2830,7 +2835,12 @@ public class ItemMatterManipulator extends Item implements ISpecialElectricItem,
                 event.setCanceled(true);
 
                 MMState state = getState(heldItem);
-                onMMBPressed(player, heldItem, state);
+                boolean addToWhitelist = state.config.placeMode == PlaceMode.EXCHANGING && MMKeyInputs.isAddWhitelistModifierDown();
+                if (addToWhitelist) {
+                    onMMBAddWhitelist(player, heldItem, state);
+                } else {
+                    onMMBPressed(player, heldItem, state);
+                }
                 setState(heldItem, state);
 
                 (addToWhitelist ? Messages.MMBAddWhitelist : Messages.MMBPressed).sendToServer();

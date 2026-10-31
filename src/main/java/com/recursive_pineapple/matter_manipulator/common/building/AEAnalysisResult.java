@@ -60,6 +60,9 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
     public InventoryAnalysis mAEPatterns = null;
     public InventoryAnalysis mAEFluidConfig = null;
 
+    /** Exchange mode changes only the centre cable, leaving all side parts and facades untouched. */
+    public boolean mOnlyCable = false;
+
     public static final ForgeDirection[] ALL_DIRECTIONS = ForgeDirection.values();
 
     private static final AEAnalysisResult NO_OP = new AEAnalysisResult();
@@ -171,6 +174,8 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
     @Override
     public boolean apply(IBlockApplyContext ctx) {
         TileEntity te = ctx.getTileEntity();
+
+        if (mOnlyCable) { return te instanceof IPartHost partHost && applyCableOnly(ctx, partHost); }
 
         if (te instanceof IColorableTile colorable && mAEColour != null) {
             colorable.recolourBlock(ForgeDirection.NORTH, mAEColour, ctx.getRealPlayer());
@@ -336,6 +341,41 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
         return success;
     }
 
+    private boolean applyCableOnly(IBlockApplyContext ctx, IPartHost partHost) {
+        ForgeDirection side = ForgeDirection.UNKNOWN;
+        AEPartData expected = MMUtils.getIndexSafe(mAEParts, side.ordinal());
+        if (expected == null) return false;
+
+        ItemStack expectedStack = expected.getEffectivePartStack();
+        if (expectedStack == null) return false;
+
+        IPart part = partHost.getPart(side);
+        ItemId actualItem = part == null ? null : ItemId.createWithoutNBT(part.getItemStack(PartItemStack.Break));
+        ItemId expectedItem = ItemId.createWithoutNBT(expectedStack);
+
+        if (actualItem != null && !Objects.equals(actualItem, expectedItem)) {
+            var result = ctx.tryConsumeItems(Arrays.asList(BigItemStack.create(expectedStack)), IPseudoInventory.CONSUME_SIMULATED);
+            if (!result.leftBoolean()) {
+                ctx.warn(new ChatComponentTranslation("mm.info.warning.could_not_extract_item", new ChatComponentItemName(expectedStack)));
+                return false;
+            }
+
+            removePart(ctx, partHost, side, false);
+            actualItem = null;
+        }
+
+        if (actualItem == null) {
+            if (!partHost.canAddPart(expectedStack, side)) return false;
+            if (!installPart(ctx, partHost, side, expected, false)) return false;
+        }
+
+        if (!expected.updatePart(ctx, partHost, side)) return false;
+
+        TileEntity te = ctx.getTileEntity();
+        Platform.notifyBlocksOfNeighbors(te.getWorldObj(), te.xCoord, te.yCoord, te.zCoord);
+        return true;
+    }
+
     static void removePart(IPseudoInventory context, IPartHost partHost, ForgeDirection side, boolean simulate) {
         IPart part = partHost.getPart(side);
 
@@ -398,6 +438,7 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
 
     @Override
     public boolean getRequiredItemsForExistingBlock(IBlockApplyContext context) {
+        if (mOnlyCable) return true;
         TileEntity te = context.getTileEntity();
 
         if (te instanceof ISegmentedInventory segmentedInventory) {
@@ -445,6 +486,13 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
 
     @Override
     public boolean getRequiredItemsForNewBlock(IBlockApplyContext context) {
+        if (mOnlyCable) {
+            AEPartData cable = MMUtils.getIndexSafe(mAEParts, ForgeDirection.UNKNOWN.ordinal());
+            if (cable == null) return false;
+
+            context.tryConsumeItems(cable.getEffectivePartStack());
+            return cable.getRequiredItemsForNewPart(context);
+        }
         if (mAEUpgrades != null) {
             for (PortableItemStack upgrade : mAEUpgrades) {
                 context.tryConsumeItems(upgrade.toStack());
@@ -516,6 +564,8 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
     public AEAnalysisResult clone() {
         AEAnalysisResult dup = new AEAnalysisResult();
 
+        dup.mOnlyCable = mOnlyCable;
+
         dup.mAEColour = mAEColour;
         dup.mAEUp = mAEUp;
         dup.mAEForward = mAEForward;
@@ -544,6 +594,7 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
         result = prime * result + ((mAECells == null) ? 0 : mAECells.hashCode());
         result = prime * result + ((mAEPatterns == null) ? 0 : mAEPatterns.hashCode());
         result = prime * result + ((mAEFluidConfig == null) ? 0 : mAEFluidConfig.hashCode());
+        result = prime * result + (mOnlyCable ? 1 : 0);
         return result;
     }
 
@@ -573,6 +624,7 @@ public class AEAnalysisResult implements ITileAnalysisIntegration {
         if (mAEFluidConfig == null) {
             if (other.mAEFluidConfig != null) return false;
         } else if (!mAEFluidConfig.equals(other.mAEFluidConfig)) return false;
+        if (mOnlyCable != other.mOnlyCable) return false;
         return true;
     }
 }

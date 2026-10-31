@@ -160,7 +160,13 @@ public class PendingBuild extends AbstractBuildable {
             existing.analyze(world.getTileEntity(x, y, z), PendingBlock.ANALYZE_ARCH);
 
             // if the existing block is the same as the one we're trying to place, just apply its tile data
-            if (PendingBlock.areEquivalent(existing, next)) {
+            boolean exchangeAECable = state.config.placeMode == PlaceMode.EXCHANGING && Mods.AppliedEnergistics2.isModLoaded() &&
+                next.ae instanceof AEAnalysisResult ae &&
+                ae.mOnlyCable &&
+                InteropConstants.AE_BLOCK_CABLE.matches(existing.getBlock(), existing.spec.getBlockMeta()) &&
+                InteropConstants.AE_BLOCK_CABLE.matches(next.getBlock(), next.spec.getBlockMeta());
+
+            if (PendingBlock.areEquivalent(existing, next) || exchangeAECable) {
                 PendingBlock block = pendingBlocks.removeFirst();
 
                 if (supportsConfiguring()) {

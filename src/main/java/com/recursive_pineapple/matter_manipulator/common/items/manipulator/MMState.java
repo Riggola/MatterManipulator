@@ -521,6 +521,146 @@ public class MMState {
         return analysis.blocks;
     }
 
+    /** Analyzes the selected Copy source before rotation and paste positioning. */
+    public RegionAnalysis getCopySource(World world) {
+        Location coordA = config.coordA;
+        Location coordB = config.coordB;
+
+        if (config.placeMode != PlaceMode.COPYING || !Location.areCompatible(coordA, coordB) || !coordA.isInWorld(world)) return null;
+
+        RegionAnalysis analysis = BlockAnalyzer.analyzeRegion(world, coordA, coordB, true);
+        if (analysis != null) applySmartCopySubstitutions(world, analysis.blocks, coordA);
+        return analysis;
+    }
+
+    /** Builds a fresh preview from a saved source snapshot without reanalyzing its tile entities. */
+    public List<PendingBlock> getCopyPreview(RegionAnalysis source, DistanceFilter filter) {
+        if (
+            config.placeMode != PlaceMode.COPYING || source == null ||
+                !Location.areCompatible(config.coordA, config.coordB, config.coordC)
+        ) return new ArrayList<>();
+
+        RegionAnalysis analysis = new RegionAnalysis();
+        analysis.deltas = new Vector3i(source.deltas);
+        analysis.blocks = new ArrayList<>(source.blocks.size());
+        for (PendingBlock block : source.blocks) analysis.blocks.add(block.clone());
+
+        Transform transform = getTransform();
+        transform.cacheRotation();
+
+        for (PendingBlock block : analysis.blocks) {
+            Vector3i rotated = transform.apply(block.toVec());
+            block.x = rotated.x;
+            block.y = rotated.y;
+            block.z = rotated.z;
+            block.transform(transform);
+            block.x += config.coordC.x;
+            block.y += config.coordC.y;
+            block.z += config.coordC.z;
+        }
+
+        if (config.arraySpan != null) {
+            List<PendingBlock> base = new ArrayList<>(analysis.blocks);
+            analysis.blocks.clear();
+
+            MMUtils.forEachArrayOffset(config.arraySpan, analysis.deltas, offset -> {
+                transform.apply(offset);
+                List<PendingBlock> copy = new ArrayList<>(base.size());
+
+                for (PendingBlock original : base) {
+                    if (filter != null && !filter.keep(original.x + offset.x, original.y + offset.y, original.z + offset.z)) continue;
+
+                    PendingBlock duplicate = original.clone();
+                    duplicate.x += offset.x;
+                    duplicate.y += offset.y;
+                    duplicate.z += offset.z;
+                    copy.add(duplicate);
+                }
+
+                if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(copy, config.coordC, offset);
+                analysis.blocks.addAll(copy);
+            });
+        } else {
+            if (filter != null) {
+                analysis.blocks.removeIf(block -> !filter.keep(block.x, block.y, block.z));
+            }
+            if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(analysis.blocks, config.coordC, new Vector3i());
+        }
+
+        analysis.deltas = transform.apply(analysis.deltas);
+        transform.uncacheRotation();
+        return analysis.blocks;
+    }
+
+    /** Analyzes the selected Copy source before rotation and paste positioning. */
+    public RegionAnalysis getCopySource(World world) {
+        Location coordA = config.coordA;
+        Location coordB = config.coordB;
+
+        if (config.placeMode != PlaceMode.COPYING || !Location.areCompatible(coordA, coordB) || !coordA.isInWorld(world)) return null;
+
+        RegionAnalysis analysis = BlockAnalyzer.analyzeRegion(world, coordA, coordB, true);
+        if (analysis != null) applySmartCopySubstitutions(world, analysis.blocks, coordA);
+        return analysis;
+    }
+
+    /** Builds a fresh preview from a saved source snapshot without reanalyzing its tile entities. */
+    public List<PendingBlock> getCopyPreview(RegionAnalysis source, DistanceFilter filter) {
+        if (
+            config.placeMode != PlaceMode.COPYING || source == null ||
+                !Location.areCompatible(config.coordA, config.coordB, config.coordC)
+        ) return new ArrayList<>();
+
+        RegionAnalysis analysis = new RegionAnalysis();
+        analysis.deltas = new Vector3i(source.deltas);
+        analysis.blocks = new ArrayList<>(source.blocks.size());
+        for (PendingBlock block : source.blocks) analysis.blocks.add(block.clone());
+
+        Transform transform = getTransform();
+        transform.cacheRotation();
+
+        for (PendingBlock block : analysis.blocks) {
+            Vector3i rotated = transform.apply(block.toVec());
+            block.x = rotated.x;
+            block.y = rotated.y;
+            block.z = rotated.z;
+            block.transform(transform);
+            block.x += config.coordC.x;
+            block.y += config.coordC.y;
+            block.z += config.coordC.z;
+        }
+
+        if (config.arraySpan != null) {
+            List<PendingBlock> base = new ArrayList<>(analysis.blocks);
+            analysis.blocks.clear();
+
+            MMUtils.forEachArrayOffset(config.arraySpan, analysis.deltas, offset -> {
+                transform.apply(offset);
+                List<PendingBlock> copy = new ArrayList<>(base.size());
+
+                for (PendingBlock original : base) {
+                    if (filter != null && !filter.keep(original.x + offset.x, original.y + offset.y, original.z + offset.z)) continue;
+
+                    PendingBlock duplicate = original.clone();
+                    duplicate.x += offset.x;
+                    duplicate.y += offset.y;
+                    duplicate.z += offset.z;
+                    copy.add(duplicate);
+                }
+
+                if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(copy, config.coordC, offset);
+                analysis.blocks.addAll(copy);
+            });
+        } else {
+            if (filter != null) analysis.blocks.removeIf(block -> !filter.keep(block.x, block.y, block.z));
+            if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(analysis.blocks, config.coordC, new Vector3i());
+        }
+
+        analysis.deltas = transform.apply(analysis.deltas);
+        transform.uncacheRotation();
+        return analysis.blocks;
+    }
+
     private void applySmartCopySubstitutions(World world, List<PendingBlock> blocks, Location coordA) {
         if (GregTech.isModLoaded() && config.replaceCribsWithProxies && hasCap(ItemMatterManipulator.ALLOW_SMART_COPY)) {
             applySmartCopyCribs(world, blocks, coordA);

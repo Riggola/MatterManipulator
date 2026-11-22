@@ -3,6 +3,7 @@ package com.recursive_pineapple.matter_manipulator.common.building;
 import static com.recursive_pineapple.matter_manipulator.common.utils.MMUtils.sendErrorToPlayer;
 import static com.recursive_pineapple.matter_manipulator.common.utils.MMUtils.sendInfoToPlayer;
 import static com.recursive_pineapple.matter_manipulator.common.utils.MMUtils.sendWarningToPlayer;
+import static com.recursive_pineapple.matter_manipulator.common.utils.Mods.AppliedEnergistics2;
 import static com.recursive_pineapple.matter_manipulator.common.utils.Mods.GregTech;
 
 import java.util.ArrayDeque;
@@ -49,6 +50,7 @@ import com.recursive_pineapple.matter_manipulator.GlobalMMConfig.BuildingConfig;
 import com.recursive_pineapple.matter_manipulator.MMMod;
 import com.recursive_pineapple.matter_manipulator.asm.Optional;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer.IBlockApplyContext;
+import com.recursive_pineapple.matter_manipulator.common.building.InteropConstants;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.ItemMatterManipulator;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.ItemMatterManipulator.ManipulatorTier;
 import com.recursive_pineapple.matter_manipulator.common.items.manipulator.MMConfig;
@@ -185,7 +187,13 @@ public class PendingBuild extends AbstractBuildable {
             existing.analyze(world.getTileEntity(x, y, z), PendingBlock.ANALYZE_ARCH);
 
             // if the existing block is the same as the one we're trying to place, just apply its tile data
-            if (PendingBlock.areEquivalent(existing, next)) {
+            boolean exchangeAECable = state.config.placeMode == PlaceMode.EXCHANGING && AppliedEnergistics2.isModLoaded() &&
+                next.ae instanceof AEAnalysisResult ae &&
+                ae.mOnlyCable &&
+                InteropConstants.AE_BLOCK_CABLE.matches(existing.getBlock(), existing.spec.getBlockMeta()) &&
+                InteropConstants.AE_BLOCK_CABLE.matches(next.getBlock(), next.spec.getBlockMeta());
+
+            if (PendingBlock.areEquivalent(existing, next) || exchangeAECable) {
                 PendingBlock block = takePendingBlock();
 
                 if (supportsConfiguring()) {

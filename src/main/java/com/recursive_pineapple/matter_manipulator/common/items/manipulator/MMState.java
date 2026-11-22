@@ -7,10 +7,12 @@ import static com.recursive_pineapple.matter_manipulator.common.utils.Mods.GregT
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -67,6 +69,7 @@ import com.recursive_pineapple.matter_manipulator.common.building.AEPartData;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockAnalyzer.RegionAnalysis;
 import com.recursive_pineapple.matter_manipulator.common.building.BlockSpec;
+import com.recursive_pineapple.matter_manipulator.common.building.CopyableProperty;
 import com.recursive_pineapple.matter_manipulator.common.building.GTAnalysisResult;
 import com.recursive_pineapple.matter_manipulator.common.building.ImmutableBlockSpec;
 import com.recursive_pineapple.matter_manipulator.common.building.InteropConstants;
@@ -543,7 +546,8 @@ public class MMState {
         RegionAnalysis analysis = new RegionAnalysis();
         analysis.deltas = new Vector3i(source.deltas);
         analysis.blocks = new ArrayList<>(source.blocks.size());
-        for (PendingBlock block : source.blocks) analysis.blocks.add(block.clone());
+        for (PendingBlock block : source.blocks)
+            analysis.blocks.add(block.clone());
 
         Transform transform = getTransform();
         transform.cacheRotation();
@@ -592,73 +596,21 @@ public class MMState {
         return analysis.blocks;
     }
 
-    /** Analyzes the selected Copy source before rotation and paste positioning. */
-    public RegionAnalysis getCopySource(World world) {
-        Location coordA = config.coordA;
-        Location coordB = config.coordB;
+    /** Captures the selected GregTech block orientation and color for an exchange replacement. */
+    @Optional(Names.GREG_TECH_NH)
+    static void captureExchangeAppearance(World world, int x, int y, int z, BlockSpec spec) {
+        TileEntity te = world.getTileEntity(x, y, z);
+        if (!(te instanceof IGregTechTileEntity gt)) return;
 
-        if (config.placeMode != PlaceMode.COPYING || !Location.areCompatible(coordA, coordB) || !coordA.isInWorld(world)) return null;
+        ForgeDirection facing = gt.getFrontFacing();
 
-        RegionAnalysis analysis = BlockAnalyzer.analyzeRegion(world, coordA, coordB, true);
-        if (analysis != null) applySmartCopySubstitutions(world, analysis.blocks, coordA);
-        return analysis;
-    }
-
-    /** Builds a fresh preview from a saved source snapshot without reanalyzing its tile entities. */
-    public List<PendingBlock> getCopyPreview(RegionAnalysis source, DistanceFilter filter) {
-        if (
-            config.placeMode != PlaceMode.COPYING || source == null ||
-                !Location.areCompatible(config.coordA, config.coordB, config.coordC)
-        ) return new ArrayList<>();
-
-        RegionAnalysis analysis = new RegionAnalysis();
-        analysis.deltas = new Vector3i(source.deltas);
-        analysis.blocks = new ArrayList<>(source.blocks.size());
-        for (PendingBlock block : source.blocks) analysis.blocks.add(block.clone());
-
-        Transform transform = getTransform();
-        transform.cacheRotation();
-
-        for (PendingBlock block : analysis.blocks) {
-            Vector3i rotated = transform.apply(block.toVec());
-            block.x = rotated.x;
-            block.y = rotated.y;
-            block.z = rotated.z;
-            block.transform(transform);
-            block.x += config.coordC.x;
-            block.y += config.coordC.y;
-            block.z += config.coordC.z;
+        EnumMap<CopyableProperty, String> properties = new EnumMap<>(CopyableProperty.class);
+        if (spec.properties != null) properties.putAll(spec.properties);
+        if (facing != null && facing != ForgeDirection.UNKNOWN) {
+            properties.put(CopyableProperty.FACING, facing.name().toLowerCase(Locale.ROOT));
         }
-
-        if (config.arraySpan != null) {
-            List<PendingBlock> base = new ArrayList<>(analysis.blocks);
-            analysis.blocks.clear();
-
-            MMUtils.forEachArrayOffset(config.arraySpan, analysis.deltas, offset -> {
-                transform.apply(offset);
-                List<PendingBlock> copy = new ArrayList<>(base.size());
-
-                for (PendingBlock original : base) {
-                    if (filter != null && !filter.keep(original.x + offset.x, original.y + offset.y, original.z + offset.z)) continue;
-
-                    PendingBlock duplicate = original.clone();
-                    duplicate.x += offset.x;
-                    duplicate.y += offset.y;
-                    duplicate.z += offset.z;
-                    copy.add(duplicate);
-                }
-
-                if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(copy, config.coordC, offset);
-                analysis.blocks.addAll(copy);
-            });
-        } else {
-            if (filter != null) analysis.blocks.removeIf(block -> !filter.keep(block.x, block.y, block.z));
-            if (AppliedEnergistics2.isModLoaded()) giveCopiedP2PInputsNewFrequencies(analysis.blocks, config.coordC, new Vector3i());
-        }
-
-        analysis.deltas = transform.apply(analysis.deltas);
-        transform.uncacheRotation();
-        return analysis.blocks;
+        properties.put(CopyableProperty.COLOR, Byte.toString(gt.getColorization()));
+        spec.properties = properties;
     }
 
     private void applySmartCopySubstitutions(World world, List<PendingBlock> blocks, Location coordA) {

@@ -290,7 +290,7 @@ public class RenderHints {
 
         final boolean instanced = InstancedHints.isSupported();
 
-        if (instanced ? InstancedHints.count() > 0 : vbo.getVertexCount() > 0) {
+        if (instanced ? InstancedHints.count() > 0 : vbo.vertexCount > 0) {
             p.startSection("Draw MM Hints");
 
             GL11.glPushMatrix();

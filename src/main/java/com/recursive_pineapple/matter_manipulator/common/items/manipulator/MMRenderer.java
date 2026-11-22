@@ -1,12 +1,12 @@
 package com.recursive_pineapple.matter_manipulator.common.items.manipulator;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.Comparator;
 
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
@@ -54,8 +54,8 @@ import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.opengl.GL11;
 
-import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 @EventBusSubscriber(side = Side.CLIENT)
@@ -581,8 +581,10 @@ public class MMRenderer {
                 boolean sourceAvailable = !copyMode || (copyChunksLoaded && !markingCopy);
                 boolean sourceReturned = copyMode && sourceAvailable && !sourceWasAvailable;
 
-                if (snapshotMode && sourceAvailable &&
-                    (sourceReturned || !hasCopySnapshot(state, player.worldObj) || needsAnalysis)) {
+                if (
+                    snapshotMode && sourceAvailable &&
+                        (sourceReturned || !hasCopySnapshot(state, player.worldObj) || needsAnalysis)
+                ) {
                     rememberCopySource(state, player.worldObj);
                 }
                 sourceWasAvailable = sourceAvailable;
@@ -606,8 +608,11 @@ public class MMRenderer {
                 }
 
                 boolean canAnalyze = sourceAvailable || snapshotAvailable;
-                boolean reanalyze = needsAnalysis || selectionChanged || viewChanged || sourceReturned ||
-                    (analysisCache == null && canAnalyze) || (!snapshotAvailable && refreshDue && sourceAvailable);
+                boolean reanalyze = needsAnalysis || selectionChanged ||
+                    viewChanged ||
+                    sourceReturned ||
+                    (analysisCache == null && canAnalyze) ||
+                    (!snapshotAvailable && refreshDue && sourceAvailable);
 
                 boolean busy = RenderHints.INSTANCE.isBuilding() || hintPass != null;
                 if (reanalyze && !busy) {
